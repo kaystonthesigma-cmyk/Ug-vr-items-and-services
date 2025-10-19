@@ -1,186 +1,208 @@
-# UG VR Marketplace — Full Frontend + Backend Prototype
-
-This is the restored full version combining the frontend and backend (previously integrated with Stripe Test Mode) while keeping the **Contact Seller** Gmail feature.
-
----
-
-## server/package.json
-
-```json
-{
-  "name": "ug-vr-marketplace-server",
-  "version": "1.0.0",
-  "type": "module",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^16.0.0",
-    "express": "^4.18.2",
-    "stripe": "^12.0.0",
-    "body-parser": "^1.20.2"
-  }
-}
-```
-
----
-
-## server/server.js
-
-```js
-import express from 'express';
-import Stripe from 'stripe';
-import bodyParser from 'body-parser';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import fs from 'fs';
-import path from 'path';
-
-dotenv.config();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-08-16' });
-const app = express();
-app.use(cors());
-app.use(bodyParser.json());
-
-const DATA_FILE = path.join(process.cwd(), 'orders.json');
-function readOrders(){ try{ return JSON.parse(fs.readFileSync(DATA_FILE,'utf8') || '[]'); }catch(e){return []} }
-function writeOrders(data){ fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2)); }
-
-const ITEMS = {
-  'magmadon-1': { id: 'magmadon-1', title: 'Mother Magmadon (Used)', price: 2000 },
-  'chomposa-1': { id: 'chomposa-1', title: 'Mother Chomposauhras', price: null },
-  'triskelotops-1': { id: 'triskelotops-1', title: 'Triskelotops CARRY', price: null }
-};
-
-app.get('/items', (req,res)=> res.json({items: Object.values(ITEMS)}));
-
-app.post('/create-checkout-session', async (req,res)=>{
-  try{
-    const { itemId, buyerEmail } = req.body;
-    const item = ITEMS[itemId];
-    if(!item || !item.price) return res.status(400).json({error:'Item not available for direct buy'});
-
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types:['card'],
-      line_items:[{
-        price_data:{
-          currency:'usd',
-          product_data:{ name: item.title, metadata:{ itemId } },
-          unit_amount:item.price
-        },
-        quantity:1
-      }],
-      mode:'payment',
-      success_url:`${process.env.FRONTEND_BASE_URL}/?purchase_success=1&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url:`${process.env.FRONTEND_BASE_URL}/?purchase_cancel=1`,
-      metadata:{ itemId }
-    });
-
-    res.json({url: session.url});
-  }catch(err){
-    console.error(err); res.status(500).json({error:err.message});
-  }
-});
-
-app.post('/webhook', bodyParser.raw({type:'application/json'}), (req,res)=>{
-  const sig = req.headers['stripe-signature'];
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  let event;
-  try{
-    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-  }catch(err){
-    console.error('Webhook signature failed', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  if(event.type==='checkout.session.completed'){
-    const session = event.data.object;
-    const itemId = session.metadata?.itemId || null;
-    const buyerEmail = session.customer_email || session.customer || null;
-    const orders = readOrders();
-    orders.push({itemId, sessionId: session.id, buyerEmail, paid:true, ts:Date.now()});
-    writeOrders(orders);
-    console.log('Order recorded:', itemId, session.id);
-  }
-
-  res.json({received:true});
-});
-
-const port = process.env.PORT || 4242;
-app.listen(port, ()=>console.log(`Server listening on ${port}`));
-```
-
----
-
-## frontend/index.html
-
-```html
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>UG VR Marketplace</title>
-<style>
-  body{font-family:Inter,sans-serif;background:#071029;color:#e6eef8;padding:24px}
-  .wrap{max-width:980px;margin:0 auto}
-  .card{background:#111827;padding:12px;border-radius:10px;margin-bottom:12px}
-  .actions{display:flex;gap:8px;margin-top:8px}
-  .btn{padding:8px 10px;border-radius:8px;border:0;background:#7c3aed;color:white;cursor:pointer}
-  .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.1)}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>UG VR Items — Marketplace</title>
+  <style>
+    :root{--accent:#7c3aed;--bg:#0f172a;--card:#111827;--muted:#9ca3af;color-scheme:dark}
+    html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Roboto,system-ui,-apple-system,"Helvetica Neue",Arial}
+    body{background:linear-gradient(180deg,#071029 0%, #071b2e 100%);color:#e6eef8;padding:28px}
+    .wrap{max-width:980px;margin:0 auto}
+    header{display:flex;align-items:center;gap:16px;margin-bottom:20px}
+    .logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#0ea5a3);display:flex;align-items:center;justify-content:center;font-weight:700;color:white}
+    h1{margin:0;font-size:20px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+    .card{background:var(--card);padding:14px;border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,0.6)}
+    .price{font-weight:700;font-size:18px}
+    .muted{color:var(--muted);font-size:13px}
+    button{background:var(--accent);border:0;color:white;padding:8px 12px;border-radius:8px;cursor:pointer}
+    .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+    .actions{display:flex;gap:8px;margin-top:12px}
+    .chat{margin-top:12px;border-top:1px dashed rgba(255,255,255,0.04);padding-top:12px}
+    .messages{height:180px;overflow:auto;background:rgba(0,0,0,0.25);padding:8px;border-radius:8px}
+    .msg{margin-bottom:8px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.03)}
+    .input-row{display:flex;gap:8px;margin-top:8px}
+    input[type=text],input[type=number]{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    .note{font-size:13px;color:var(--muted);margin-top:8px}
+    footer{margin-top:18px;color:var(--muted);font-size:13px}
+    .badge{display:inline-block;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.03);font-size:13px}
+  </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>UG VR Items — Marketplace</h1>
-  <div id="items"></div>
-</div>
-<script>
-const ITEMS=[
-  {id:'magmadon-1',title:'Mother Magmadon (Used)',price:20.00,type:'fixed'},
-  {id:'chomposa-1',title:'Mother Chomposauhras',price:null,type:'offer'},
-  {id:'triskelotops-1',title:'Triskelotops CARRY',price:null,type:'offer'}
-];
-const CASHAPP_TAG='$kaystonbuckley';
-const SELLER_EMAIL='kayston108@gmail.com';
+  <div class="wrap">
+    <header>
+      <div class="logo">UG</div>
+      <div>
+        <h1>UG VR Items — Small Drop</h1>
+        <div class="muted">Seller: <span class="badge">$kaystonbuckley (Cash App)</span></div>
+      </div>
+    </header>
 
-function formatMoney(n){return '$'+Number(n).toFixed(2);}
+    <main class="grid" id="items"></main>
 
-function render(){
-  const el=document.getElementById('items');
-  el.innerHTML='';
-  ITEMS.forEach(item=>{
-    const c=document.createElement('div'); c.className='card';
-    c.innerHTML=`<h3>${item.title}</h3><div>${item.price?formatMoney(item.price):'Offer'}</div>
-      <div class="actions">
-        ${item.type==='fixed'?'<button class="buy btn">Buy</button>':''}
-        <button class="contact btn-ghost">Contact Seller</button>
-      </div>`;
+    <footer>
+      This is a front-end demo. Payments are handled via Cash App link (opens cash.app). For production you should add a secure backend, verified payment processor, and real-time chat server. I can help build that if you'd like.
+    </footer>
+  </div>
 
-    c.querySelectorAll('.contact').forEach(b=>b.addEventListener('click',()=>{
-      const subject=encodeURIComponent('Interest in: '+item.title);
-      const body=encodeURIComponent('Hi,\n\nI am interested in your item: '+item.title+'\nPlease contact me.\n\nThanks.');
-      window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${SELLER_EMAIL}&su=${subject}&body=${body}`,'_blank');
-    }));
+  <script>
+    const CATALOG = [
+      {
+        id: 'magmadon-1',
+        title: 'Mother Magmadon (Used)',
+        desc: 'A used Mother Magmadon — rare VR asset. Quantity: 1',
+        price: 20.00,
+        type: 'fixed'
+      },
+      {
+        id: 'chomposa-1',
+        title: 'Mother Chomposauhras',
+        desc: 'One-of-a-kind. Quantity: 1',
+        price: null,
+        type: 'offer'
+      },
+      {
+        id: 'triskelotops-1',
+        title: 'Triskelotops CARRY',
+        desc: 'Legendary triskelotops carry. Quantity: 1',
+        price: null,
+        type: 'offer'
+      }
+    ];
 
-    el.appendChild(c);
-  });
-}
+    const CASHAPP_TAG = '$kaystonbuckley';
+    const CASHAPP_URL = 'https://cash.app/' + CASHAPP_TAG.replace('$','');
+    const SELLER_EMAIL = 'kayston108@gmail.com';
 
-window.addEventListener('DOMContentLoaded',()=>render());
-</script>
+    function formatMoney(n){return '$' + Number(n).toFixed(2)}
+
+    function render(){
+      const el = document.getElementById('items');
+      el.innerHTML = '';
+      CATALOG.forEach(item => {
+        const c = document.createElement('div');
+        c.className = 'card';
+        c.innerHTML = `
+          <h3>${item.title}</h3>
+          <div class="muted">${item.desc}</div>
+          <div style="margin-top:8px">
+            <span class="price">${item.type === 'fixed' ? formatMoney(item.price) : 'Offer'}</span>
+            <div class="muted">Seller: ${CASHAPP_TAG}</div>
+          </div>
+          <div class="actions">
+            ${item.type === 'fixed' ? '<button class="buy">Buy</button>' : '<button class="offer">Make Offer</button>'}
+            <button class="contact btn-ghost">Contact Seller</button>
+            <button class="copy btn-ghost">Copy Cash App Tag</button>
+          </div>
+          <div class="note">After purchase the in-page chat for this item will unlock so you and the seller can exchange messages.</div>
+          <div class="chat" data-item="${item.id}" style="display:none">
+            <div class="messages" id="messages-${item.id}"></div>
+            <div class="input-row">
+              <input type="text" placeholder="Write message..." class="chat-input" data-item="${item.id}" />
+              <button class="send">Send</button>
+            </div>
+          </div>
+        `;
+
+        c.querySelectorAll('.buy').forEach(b=>b.addEventListener('click',()=>onBuy(item)));
+        c.querySelectorAll('.offer').forEach(b=>b.addEventListener('click',()=>onOffer(item)));
+        c.querySelectorAll('.contact').forEach(b=>b.addEventListener('click',()=>onContact(item)));
+        c.querySelectorAll('.copy').forEach(b=>b.addEventListener('click',()=>copyCashtag()));
+
+        el.appendChild(c);
+      });
+
+      document.querySelectorAll('.send').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+          const input = btn.parentElement.querySelector('.chat-input');
+          const itemId = input.dataset.item;
+          const text = input.value.trim();
+          if(!text) return;
+          addMessage(itemId, 'You', text);
+          input.value='';
+        });
+      });
+    }
+
+    function copyCashtag(){
+      navigator.clipboard?.writeText(CASHAPP_TAG).then(()=>alert('Cashtag copied: ' + CASHAPP_TAG)).catch(()=>alert('Copy failed — please copy manually: ' + CASHAPP_TAG));
+    }
+
+    function onContact(item){
+      const subject = encodeURIComponent('Interest in: ' + item.title);
+      const body = encodeURIComponent('Hi,\n\nI am interested in your item: ' + item.title + '\nPlease contact me.\n\nThanks.');
+      window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${SELLER_EMAIL}&su=${subject}&body=${body}`, '_blank');
+    }
+
+    function onOffer(item){
+      const offer = prompt('Enter your offer amount in USD (numbers only):');
+      if(!offer) return;
+      const num = Number(offer);
+      if(isNaN(num) || num <= 0){ alert('Invalid amount'); return; }
+      const subject = encodeURIComponent('Offer for: ' + item.title);
+      const body = encodeURIComponent(`Hi,\n\nI make an offer of ${formatMoney(num)} for ${item.title}.\n\nPlease contact me to accept or counteroffer.\n\nYou can request payment via Cash App: ${CASHAPP_TAG} or this link: ${CASHAPP_URL}`);
+      window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${SELLER_EMAIL}&su=${subject}&body=${body}`, '_blank');
+    }
+
+    function onBuy(item){
+      if(item.type !== 'fixed') return;
+      const confirmed = confirm(`Buy ${item.title} for ${formatMoney(item.price)}? You will be asked to send payment via Cash App to ${CASHAPP_TAG}. Click OK to continue.`);
+      if(!confirmed) return;
+
+      const ok = confirm('This demo will now open the seller Cash App page in a new tab. After you send payment to the seller, click OK to unlock chat and messages with the seller. Do NOT send money unless you trust the seller.');
+      if(ok){
+        window.open(CASHAPP_URL,'_blank');
+      }
+
+      localStorage.setItem('purchased_' + item.id, '1');
+      unlockChatFor(item.id);
+      alert('Purchase marked locally — chat unlocked for this item. In a real site this would be verified by the server after confirmed payment.');
+    }
+
+    function unlockChatFor(itemId){
+      const chat = document.querySelector(`.chat[data-item="${itemId}"]`);
+      if(!chat) return;
+      chat.style.display = 'block';
+      loadMessages(itemId);
+    }
+
+    function addMessage(itemId, who, text){
+      const k = 'chat_' + itemId;
+      const arr = JSON.parse(localStorage.getItem(k) || '[]');
+      arr.push({who,text,ts:Date.now()});
+      localStorage.setItem(k, JSON.stringify(arr));
+      renderMessages(itemId);
+    }
+
+    function loadMessages(itemId){
+      renderMessages(itemId);
+    }
+
+    function renderMessages(itemId){
+      const msgs = JSON.parse(localStorage.getItem('chat_' + itemId) || '[]');
+      const cont = document.getElementById('messages-' + itemId);
+      if(!cont) return;
+      cont.innerHTML = '';
+      msgs.forEach(m=>{
+        const d = document.createElement('div'); d.className='msg';
+        d.innerHTML = `<strong>${m.who}</strong>: ${escapeHtml(m.text)} <div class="muted" style="font-size:11px">${new Date(m.ts).toLocaleString()}</div>`;
+        cont.appendChild(d);
+      });
+      cont.scrollTop = cont.scrollHeight;
+    }
+
+    function escapeHtml(str){return String(str).replace(/[&<>\"']/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[s]));}
+
+    window.addEventListener('DOMContentLoaded',()=>{
+      render();
+      CATALOG.forEach(it=>{
+        if(localStorage.getItem('purchased_' + it.id)) unlockChatFor(it.id);
+      });
+
+      document.querySelectorAll('.badge').forEach(b=>b.addEventListener('click',()=>window.open(CASHAPP_URL,'_blank')));
+    });
+  </script>
 </body>
 </html>
-```
 
----
-
-This is the **restored full code** including:
-
-* Frontend UI with all 3 items
-* Stripe backend (test mode) for checkout and webhook
-* Contact Seller button opening Gmail with pre-filled email
-* CashApp reference in backend/frontend comments for later integration
-
-You can deploy this exactly as-is to **Render (backend)** and **Vercel/GitHub Pages (frontend)**.
