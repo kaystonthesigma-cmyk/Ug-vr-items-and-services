@@ -7,6 +7,7 @@ ug-vr-marketplace/
 <!doctype html>
 <!doctype html>
 <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -47,9 +48,9 @@ ug-vr-marketplace/
 
 <script>
 const ITEMS = [
-  {id:'magmadon-1',title:'Magma Whitnewoth (Cracks + Dots)',price:20,type:'fixed'},
-  {id:'chomposa-1',title:'Grugadon',price:null,type:'offer'},
-  {id:'triskelotops-1',title:'Triskelotops',price:null,type:'offer'}
+  {id:'magmadon-1',title:'Mother Magmadon (Used)',price:20,type:'fixed'},
+  {id:'chomposa-1',title:'Mother Chomposauhras',price:null,type:'offer'},
+  {id:'triskelotops-1',title:'Triskelotops CARRY',price:null,type:'offer'}
 ];
 const CASHAPP_TAG='$kaystonbuckley';
 const SELLER_EMAIL='kayston108@gmail.com';
@@ -57,17 +58,17 @@ const SELLER_EMAIL='kayston108@gmail.com';
 let currentUser=null;
 let isOwner=false;
 
-// Storage helpers
 function saveUsers(users){localStorage.setItem('vr_users',JSON.stringify(users));}
 function loadUsers(){return JSON.parse(localStorage.getItem('vr_users')||'[]');}
 function saveOrders(orders){localStorage.setItem('vr_orders',JSON.stringify(orders));}
 function loadOrders(){return JSON.parse(localStorage.getItem('vr_orders')||'[]');}
 
-// Register buyer (owner cannot register)
+// Register new buyer
 function register(){
   const email=document.getElementById('email').value.trim();
   const password=document.getElementById('password').value.trim();
   if(!email||!password){alert('Enter email and password');return;}
+  // prevent overwriting owner account
   if(email==='kayston108@gmail.com'){alert('Owner account already exists. Use login.'); return;}
   const users=loadUsers();
   if(users.find(u=>u.email===email)){alert('Email exists');return;}
@@ -76,7 +77,7 @@ function register(){
   alert('Registered! You can now login.');
 }
 
-// Login function (owner always works)
+// Login function
 function login(){
   const email=document.getElementById('email').value.trim();
   const password=document.getElementById('password').value.trim();
@@ -110,7 +111,7 @@ function renderItems(){
     const card=document.createElement('div');
     card.className='card';
 
-    // Owner always sees chat
+    // check if current user purchased item or is owner
     let owns=orders.find(o=>o.itemId===item.id && o.user===currentUser);
     if(isOwner) owns=true;
 
@@ -130,7 +131,7 @@ function renderItems(){
   });
 }
 
-// Buy / offer
+// Buy or make offer
 function buy(itemId){
   const item=ITEMS.find(i=>i.id===itemId);
   if(item.type==='fixed'){
