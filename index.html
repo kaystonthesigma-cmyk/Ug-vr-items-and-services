@@ -27,14 +27,14 @@ ug-vr-marketplace/
   <h2>Login / Register</h2>
   <input type="text" id="email" placeholder="Email">
   <input type="password" id="password" placeholder="Password">
-  <button onclick="register()">Register</button>
-  <button onclick="login()">Login</button>
+  <button type="button" onclick="register()">Register</button>
+  <button type="button" onclick="login()">Login</button>
 </div>
 
 <div class="catalog" id="catalogDiv" style="display:none;">
   <h2>Items for Sale</h2>
   <div id="items"></div>
-  <button onclick="logout()">Logout</button>
+  <button type="button" onclick="logout()">Logout</button>
 </div>
 
 </div>
@@ -110,12 +110,12 @@ function renderItems(){
 
     card.innerHTML=`<h3>${item.title}</h3>
     <p>Price: ${item.type==='fixed'? '$'+item.price : 'Offer'}</p>
-    <button onclick="buy('${item.id}')">${item.type==='fixed'?'Buy':'Make Offer'}</button>
-    <button onclick="contactSeller('${item.title}')">Contact Seller</button>
+    <button type="button" onclick="buy('${item.id}')">${item.type==='fixed'?'Buy':'Make Offer'}</button>
+    <button type="button" onclick="contactSeller('${item.title}')">Contact Seller</button>
     <div class="chat" id="chat-${item.id}">
       <div class="messages" id="msgs-${item.id}"></div>
       <input type="text" id="input-${item.id}" placeholder="Type message...">
-      <button onclick="sendMsg('${item.id}')">Send</button>
+      <button type="button" onclick="sendMsg('${item.id}')">Send</button>
     </div>`;
     container.appendChild(card);
 
@@ -128,18 +128,4 @@ function renderItems(){
 function buy(itemId){
   const item=ITEMS.find(i=>i.id===itemId);
   if(item.type==='fixed'){
-    if(!confirm(`Buy ${item.title} for $${item.price}?`)) return;
-    alert(`Open Cash App and send payment to ${CASHAPP_TAG}`);
-  }else{
-    const offer=prompt('Enter your offer amount in USD:');
-    if(!offer) return;
-    alert(`Offer of $${offer} sent! Open Gmail to contact seller.`);
-  }
-  const orders=loadOrders();
-  orders.push({user:currentUser,itemId});
-  saveOrders(orders);
-  document.getElementById(`chat-${itemId}`).style.display='block';
-}
-
-// Contact seller via Gmail
-function contactSeller(it
+    if(!confirm(`Buy ${item.title} for $${it
