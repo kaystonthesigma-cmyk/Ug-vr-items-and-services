@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>UG VR Marketplace — Shop</title>
+<style>
+  :root{--accent:#7c3aed;--bg:#0f172a;--card:#111827;--muted:#9ca3af}
+  body{background:linear-gradient(180deg,#071029 0%, #071b2e 100%);color:#e6eef8;font-family:Inter,system-ui;padding:28px}
+  .wrap{max-width:980px;margin:0 auto}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+  .logo{display:flex;gap:12px;align-items:center}
+  .badge{background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:999px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+  .card{background:var(--card);padding:14px;border-radius:12px}
+  .muted{color:var(--muted);font-size:13px}
+  .actions{display:flex;gap:8px;margin-top:12px}
+  button{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:white;cursor:pointer}
+  .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:inherit}
+  .chat{margin-top:12px;border-top:1px dashed rgba(255,255,255,0.04);padding-top:12px}
+  .messages{height:140px;overflow:auto;background:rgba(0,0,0,0.25);padding:8px;border-radius:8px}
+  .msg{margin-bottom:8px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.03)}
+  .input-row{display:flex;gap:8px;margin-top:8px}
+  input[type=text]{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo">
+        <div style="width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#0ea5a3);display:flex;align-items:center;justify-content:center;font-weight:700">UG</div>
+        <div>
+          <div style="font-weight:700">UG VR Marketplace</div>
+          <div class="muted" id="userInfo">—</div>
+        </div>
+      </div>
+      <div>
+        <button id="btnLogout" class="btn-ghost" type="button">Logout</button>
+      </div>
+    </header>
+
+    <main class="grid" id="items"></main>
+
+    <footer style="margin-top:18px;color:var(--muted);font-size:13px">
+      Contact & payments are demo; Contact Seller opens Gmail and Buy opens Cash App link.
+    </footer>
+  </div>
+
+<script>
+// MARKET: requires current user; redirect to login if none
+
+function getCurrent(){ try { return JSON.parse(localStorage.getItem('vr_current')); } catch(e){ return null; } }
+function setCurrent(cur){ localStorage.setItem('vr_current', JSON.stringify(cur)); }
+function clearCurrent(){ localStorage.removeItem('vr_current'); }
+
+function loadOrders(){ return JSON.parse(localStorage.getItem('vr_orders')||'[]'); }
+function saveOrders(o){ localStorage.setItem('vr_orders', JSON.stringify(o)); }
+function loadChats(){ return JSON.parse(localStorage.getItem('vr_chats')||'[]'); }
+function saveChats(c){ localStorage.setItem('vr_chats', JSON.stringify(c)); }
+
+// Items (updated names)
+const ITEMS = [
+  { id: 'magmadon-1', title: 'Magma Whitnewoth (Cracks + Dots)', desc: 'Rare used asset — Quantity: 1', price: 20.00, type: 'fixed' },
+  { id: 'chomposa-1', title: 'Grugadon', desc: 'One-of-a-kind — Quantity: 1', price: null, type: 'offer' },
+  { id: 'triskelotops-1', title: 'Triskelotops', desc: 'Legendary — Quantity: 1', price: null, type: 'offer' }
+];
+
+const CASHAPP_TAG = '$kaystonbuckley';
+const CASHAPP_URL = 'https://cash.app/' + CASHAPP_TAG.replace('$','');
+const SELLER_EMAIL = 'kayston108@gmail.com';
+
+let current = getCurrent();
+if(!current || !current.email){ window.location.href = 'login.html'; throw 'not logged in'; }
+
+// show user info
+document.getElementById('userInfo').textContent = `${current.email} (${current.role})`;
+
+// logout
+document.getElementById('btnLogout').addEventListener('click', ()=>{
+  clearCurrent();
+  window.location.href = 'login.html';
+});
+
+// rendering
+function formatMoney(n){ return '$' + Number(n).toFixed(2); }
+
+function render(){
+  const el = document.getElementById('items');
+  el.innerHTML = '';
+  ITEMS.forEach(item=>{
+    const card = document.createElement('div'); card.className='card';
+    const orders = loadOrders();
+    const bought = orders.find(o => o.itemId === item.id && o.user === current.email);
+
+    card.innerHTML = `
+      <h3>${item.title}</h3>
+      <div class="muted">${item.desc}</div>
+      <div style="margin-top:8px">
+        <strong>${item.type === 'fixed' ? formatMoney(item.price) : 'Offer'}</strong>
+        <div class="muted">Seller: ${CASHAPP_TAG}</div>
+      </div>
+      <div class="actions">
+        ${item.type === 'fixed' ? '<button class="buy" type="button">Buy</button>' : '<button class="offer" type="button">Make Offer</button>'}
+        <button class="contact btn-ghost" type="button">Contact Seller</button>
+        <button class="copy btn-ghost" type="button">Copy Cash App</button>
+      </div>
+      <div class="note" style="margin-top:8px">After purchase the in-page chat will unlock so you and the seller can exchange messages.</div>
+      <div class="chat" data-item="${item.id}" style="display:none; margin-top:12px">
+        <div class="messages" id="messages-${item.id}"></div>
+        <div class="input-row">
+          <input type="text" id="input-${item.id}" placeholder="Write message..." />
+          <button class="send" type="button">Send</button>
+        </div>
+      </div>
+    `;
+
+    // button actions
+    card.querySelectorAll('.buy').forEach(b=> b.addEventListener('click', ()=> onBuy(item)));
+    card.querySelectorAll('.offer').forEach(b=> b.addEventListener('click', ()=> onOffer(item)));
+    card.querySelectorAll('.contact').forEach(b=> b.addEventListener('click', ()=> onContact(item)));
+    card.querySelectorAll('.copy').forEach(b=> b.addEventListener('click', ()=> copyCashtag()));
+
+    el.appendChild(card);
+
+    // If owner, always show chat; if buyer purchased, show chat
+    const chatEl = card.querySelector('.chat');
+    if(current.role === 'owner' || bought){
+      chatEl.style.display = 'block';
+      loadMessages(item.id);
+    }
+  });
+
+  // attach global send handlers (works because chats have unique IDs)
+  document.querySelectorAll('.send').forEach(btn=>{
+    btn.addEventListener('click', async (ev)=>{
+      const input = btn.parentElement.querySelector('input');
+      const itemId = btn.parentElement.parentElement.getAttribute('data-item');
+      const text = input.value.trim();
+      if(!text) return;
+      addMessage(itemId, current.email, text);
+      input.value = '';
+      loadMessages(itemId);
+    });
+  });
+}
+
+function copyCashtag(){ navigator.clipboard?.writeText(CASHAPP_TAG).then(()=>alert('Cashtag copied: ' + CASHAPP_TAG)).catch(()=>alert('Copy failed — copy manually: ' + CASHAPP_TAG)); }
+
+function onContact(item){
+  const subject = encodeURIComponent('Interest in: ' + item.title);
+  const body = encodeURIComponent('Hi,\n\nI am interested in your item: ' + item.title + '\nPlease contact me.\n\nThanks.');
+  window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${SELLER_EMAIL}&su=${subject}&body=${body}`, '_blank');
+}
+
+function onOffer(item){
+  const offer = prompt('Enter your offer amount in USD (numbers only):');
+  if(!offer) return;
+  const num = Number(offer);
+  if(isNaN(num) || num <= 0){ alert('Invalid amount'); return; }
+  const subject = encodeURIComponent('Offer for: ' + item.title);
+  const body = encodeURIComponent(`Hi,\n\nI make an offer of ${formatMoney(num)} for ${item.title}.\n\nPlease contact me to accept or counteroffer.\n\nYou can request payment via Cash App: ${CASHAPP_TAG} or ${CASHAPP_URL}`);
+  window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${SELLER_EMAIL}&su=${subject}&body=${body}`, '_blank');
+}
+
+function onBuy(item){
+  if(item.type !== 'fixed') return;
+  if(!confirm(`Buy ${item.title} for ${formatMoney(item.price)}? You will be asked to send payment via Cash App to ${CASHAPP_TAG}. Click OK to continue.`)) return;
+  if(confirm('This demo will open the seller Cash App page. After you send payment, click OK to unlock chat. Do NOT send money unless you trust the seller.')){
+    window.open(CASHAPP_URL, '_blank');
+  }
+  const orders = loadOrders();
+  orders.push({ user: current.email, itemId: item.id, ts: Date.now() });
+  saveOrders(orders);
+  // show chat
+  const chat = document.querySelector(`.chat[data-item="${item.id}"]`);
+  if(chat) chat.style.display = 'block';
+  loadMessages(item.id);
+  alert('Purchase saved locally. Chat unlocked (demo).');
+}
+
+// Chat storage & rendering (simple array of {itemId, who, text, ts})
+function addMessage(itemId, who, text){
+  const chats = loadChats();
+  chats.push({ itemId, who, text, ts: Date.now() });
+  saveChats(chats);
+}
+
+function loadMessages(itemId){
+  const chats = loadChats();
+  const box = document.getElementById('messages-' + itemId);
+  if(!box) return;
+  box.innerHTML = '';
+  const filtered = chats.filter(c => c.itemId === itemId);
+  filtered.forEach(m=>{
+    const d = document.createElement('div'); d.className='msg';
+    d.innerHTML = `<strong>${m.who}</strong>: ${escapeHtml(m.text)} <div class="muted" style="font-size:11px">${new Date(m.ts).toLocaleString()}</div>`;
+    box.appendChild(d);
+  });
+  box.scrollTop = box.scrollHeight;
+}
+
+function escapeHtml(s){ return String(s).replace(/[&<>\"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch])); }
+
+// initial render
+render();
+</script>
+</body>
+</html>
