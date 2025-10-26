@@ -1,196 +1,89 @@
 ug-vr-marketplace/
 └── index.html
-// Ensure no page reload issues break login
-window.onload = () => {
-  localStorage.removeItem('vr_users'); // clears old users
-  localStorage.removeItem('vr_orders'); // clears old orders
-};
+
+
 
 <!DOCTYPE html>
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UG VR Marketplace — Demo</title>
-<style>
-  body{background:#0f172a;color:#e6eef8;font-family:sans-serif;margin:0;padding:20px;}
-  .container{max-width:900px;margin:0 auto;}
-  h1{text-align:center;}
-  .login, .catalog{margin:20px 0;}
-  input{padding:8px;margin:4px 0;width:100%;border-radius:6px;border:none;}
-  button{padding:8px 12px;border:none;border-radius:6px;background:#7c3aed;color:white;cursor:pointer;margin:4px 0;}
-  .card{background:#111827;padding:12px;border-radius:10px;margin:10px 0;}
-  .chat{display:none;margin-top:10px;}
-  .messages{height:120px;overflow:auto;background:rgba(255,255,255,0.05);padding:6px;border-radius:6px;margin-bottom:4px;}
-  .msg{margin-bottom:4px;}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>UG VR Items — Marketplace</title>
+  <style>
+    :root{--accent:#7c3aed;--bg:#0f172a;--card:#111827;--muted:#9ca3af;color-scheme:dark}
+    html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Roboto,system-ui,-apple-system,"Helvetica Neue",Arial}
+    body{background:linear-gradient(180deg,#071029 0%, #071b2e 100%);color:#e6eef8;padding:28px}
+    .wrap{max-width:980px;margin:0 auto}
+    header{display:flex;align-items:center;gap:16px;margin-bottom:20px}
+    .logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#0ea5a3);display:flex;align-items:center;justify-content:center;font-weight:700;color:white}
+    h1{margin:0;font-size:20px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+    .card{background:var(--card);padding:14px;border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,0.6)}
+    .price{font-weight:700;font-size:18px}
+    .muted{color:var(--muted);font-size:13px}
+    button{background:var(--accent);border:0;color:white;padding:8px 12px;border-radius:8px;cursor:pointer}
+    .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+    .actions{display:flex;gap:8px;margin-top:12px}
+    .chat{margin-top:12px;border-top:1px dashed rgba(255,255,255,0.04);padding-top:12px}
+    .messages{height:180px;overflow:auto;background:rgba(0,0,0,0.25);padding:8px;border-radius:8px}
+    .msg{margin-bottom:8px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.03)}
+    .input-row{display:flex;gap:8px;margin-top:8px}
+    input[type=text],input[type=number]{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    .note{font-size:13px;color:var(--muted);margin-top:8px}
+    footer{margin-top:18px;color:var(--muted);font-size:13px}
+    .badge{display:inline-block;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.03);font-size:13px}
+  </style>
 </head>
 <body>
-<div class="container">
-<h1>UG VR Marketplace Demo</h1>
+  <div class="wrap">
+    <header>
+      <div class="logo">UG</div>
+      <div>
+        <h1>UG VR Items — Small Drop</h1>
+        <div class="muted">Seller: <span class="badge">$kaystonbuckley (Cash App)</span></div>
+      </div>
+    </header>
 
-<div class="login" id="loginDiv">
-  <h2>Login / Register</h2>
-  <input type="text" id="email" placeholder="Email">
-  <input type="password" id="password" placeholder="Password">
-  <button type="button" onclick="register()">Register</button>
-  <button type="button" onclick="login()">Login</button>
-</div>
+    <main class="grid" id="items"></main>
 
-<div class="catalog" id="catalogDiv" style="display:none;">
-  <h2>Items for Sale</h2>
-  <div id="items"></div>
-  <button type="button" onclick="logout()">Logout</button>
-</div>
+    <footer>
+      This is a front-end demo. Payments are handled via Cash App link (opens cash.app). For production you should add a secure backend, verified payment processor, and real-time chat server. I can help build that if you'd like.
+    </footer>
+  </div>
 
-</div>
+  <script>
+    const CATALOG = [
+      {
+        id: 'magmadon-1',
+        title: 'Magma Whitnewoth (Cracks + Dots)',
+        desc: 'A used Magma Whitnewoth — rare VR asset. Quantity: 1',
+        price: 20.00,
+        type: 'fixed'
+      },
+      {
+        id: 'chomposa-1',
+        title: 'Grugadon',
+        desc: 'One-of-a-kind. Quantity: 1',
+        price: null,
+        type: 'offer'
+      },
+      {
+        id: 'triskelotops-1',
+        title: 'Triskelotops',
+        desc: 'Legendary triskelotops. Quantity: 1',
+        price: null,
+        type: 'offer'
+      }
+    ];
 
-<script>
-// Clear old localStorage to prevent login issues
-window.onload = () => {
-  localStorage.removeItem('vr_users');
-  localStorage.removeItem('vr_orders');
-};
+    const CASHAPP_TAG = '$kaystonbuckley';
+    const CASHAPP_URL = 'https://cash.app/' + CASHAPP_TAG.replace('$','');
+    const SELLER_EMAIL = 'kayston108@gmail.com';
 
-const ITEMS = [
-  {id:'magmadon-1',title:'Magma Whitnewoth (Cracks + Dots)',price:20,type:'fixed'},
-  {id:'chomposa-1',title:'Grugadon',price:null,type:'offer'},
-  {id:'triskelotops-1',title:'Triskelotops',price:null,type:'offer'}
-];
-const CASHAPP_TAG='$kaystonbuckley';
-const SELLER_EMAIL='kayston108@gmail.com';
+    function formatMoney(n){return '$' + Number(n).toFixed(2)}
 
-let currentUser=null;
-let isOwner=false;
+    function render(){
+      const el = document.get
 
-// Storage helpers
-function saveUsers(users){localStorage.setItem('vr_users',JSON.stringify(users));}
-function loadUsers(){return JSON.parse(localStorage.getItem('vr_users')||'[]');}
-function saveOrders(orders){localStorage.setItem('vr_orders',JSON.stringify(orders));}
-function loadOrders(){return JSON.parse(localStorage.getItem('vr_orders')||'[]');}
 
-// Register buyer (owner cannot register)
-function register(){
-  const email=document.getElementById('email').value.trim();
-  const password=document.getElementById('password').value.trim();
-  if(!email||!password){alert('Enter email and password');return;}
-  if(email==='kayston108@gmail.com'){alert('Owner account already exists. Use login.'); return;}
-  const users=loadUsers();
-  if(users.find(u=>u.email===email)){alert('Email exists');return;}
-  users.push({email,password});
-  saveUsers(users);
-  alert('Registered! You can now login.');
-}
-
-// Login function (owner always works)
-function login(){
-  const email=document.getElementById('email').value.trim();
-  const password=document.getElementById('password').value.trim();
-
-  // Owner login
-  if(email==='kayston108@gmail.com' && password==='Hailee1212'){
-    currentUser=email;
-    isOwner=true;
-    alert('Logged in as Owner!');
-    document.getElementById('loginDiv').style.display='none';
-    document.getElementById('catalogDiv').style.display='block';
-    renderItems();
-    return;
-  }
-
-  // Check normal users
-  const users=loadUsers();
-  const u=users.find(u=>u.email===email && u.password===password);
-  if(!u){alert('Invalid credentials');return;}
-  currentUser=u.email;
-  isOwner=false;
-  document.getElementById('loginDiv').style.display='none';
-  document.getElementById('catalogDiv').style.display='block';
-  renderItems();
-}
-
-// Logout
-function logout(){currentUser=null; isOwner=false; document.getElementById('loginDiv').style.display='block'; document.getElementById('catalogDiv').style.display='none';}
-
-// Render catalog
-function renderItems(){
-  const container=document.getElementById('items');
-  container.innerHTML='';
-  const orders=loadOrders();
-
-  ITEMS.forEach(item=>{
-    const card=document.createElement('div');
-    card.className='card';
-
-    let owns=orders.find(o=>o.itemId===item.id && o.user===currentUser);
-    if(isOwner) owns=true;
-
-    card.innerHTML=`<h3>${item.title}</h3>
-    <p>Price: ${item.type==='fixed'? '$'+item.price : 'Offer'}</p>
-    <button type="button" onclick="buy('${item.id}')">${item.type==='fixed'?'Buy':'Make Offer'}</button>
-    <button type="button" onclick="contactSeller('${item.title}')">Contact Seller</button>
-    <div class="chat" id="chat-${item.id}">
-      <div class="messages" id="msgs-${item.id}"></div>
-      <input type="text" id="input-${item.id}" placeholder="Type message...">
-      <button type="button" onclick="sendMsg('${item.id}')">Send</button>
-    </div>`;
-    container.appendChild(card);
-
-    if(owns) document.getElementById(`chat-${item.id}`).style.display='block';
-    if(owns) renderMsgs(item.id);
-  });
-}
-
-// Buy / offer
-function buy(itemId){
-  const item=ITEMS.find(i=>i.id===itemId);
-  if(item.type==='fixed'){
-    if(!confirm(`Buy ${item.title} for $${item.price}?`)) return;
-    alert(`Open Cash App and send payment to ${CASHAPP_TAG}`);
-  }else{
-    const offer=prompt('Enter your offer amount in USD:');
-    if(!offer) return;
-    alert(`Offer of $${offer} sent! Open Gmail to contact seller.`);
-  }
-  const orders=loadOrders();
-  orders.push({user:currentUser,itemId});
-  saveOrders(orders);
-  document.getElementById(`chat-${itemId}`).style.display='block';
-}
-
-// Contact seller via Gmail
-function contactSeller(itemTitle){
-  const subject=encodeURIComponent('Interest in: '+itemTitle);
-  const body=encodeURIComponent(`Hi,\n\nI am interested in your item: ${itemTitle}\nPlease contact me.\n\nThanks.`);
-  window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${SELLER_EMAIL}&su=${subject}&body=${body}`,'_blank');
-}
-
-// Send message in chat
-function sendMsg(itemId){
-  const input=document.getElementById(`input-${itemId}`);
-  const text=input.value.trim();
-  if(!text) return;
-  const key='chat_'+itemId;
-  const msgs=JSON.parse(localStorage.getItem(key)||'[]');
-  msgs.push({who:currentUser,text});
-  localStorage.setItem(key,JSON.stringify(msgs));
-  renderMsgs(itemId);
-  input.value='';
-}
-
-// Render messages
-function renderMsgs(itemId){
-  const key='chat_'+itemId;
-  const msgs=JSON.parse(localStorage.getItem(key)||'[]');
-  const container=document.getElementById(`msgs-${itemId}`);
-  container.innerHTML='';
-  msgs.forEach(m=>{
-    const div=document.createElement('div');div.className='msg';
-    div.textContent=`${m.who}: ${m.text}`;
-    container.appendChild(div);
-  });
-}
-</script>
-</body>
-</html>
