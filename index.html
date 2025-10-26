@@ -5,6 +5,7 @@ ug-vr-marketplace/
 
 <!DOCTYPE html>
 <!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -84,6 +85,130 @@ ug-vr-marketplace/
     function formatMoney(n){return '$' + Number(n).toFixed(2)}
 
     function render(){
-      const el = document.get
+      const el = document.getElementById('items');
+      el.innerHTML = '';
+      CATALOG.forEach(item => {
+        const c = document.createElement('div');
+        c.className = 'card';
+        c.innerHTML = `
+          <h3>${item.title}</h3>
+          <div class="muted">${item.desc}</div>
+          <div style="margin-top:8px">
+            <span class="price">${item.type === 'fixed' ? formatMoney(item.price) : 'Offer'}</span>
+            <div class="muted">Seller: ${CASHAPP_TAG}</div>
+          </div>
+          <div class="actions">
+            ${item.type === 'fixed' ? '<button class="buy">Buy</button>' : '<button class="offer">Make Offer</button>'}
+            <button class="contact btn-ghost">Contact Seller</button>
+            <button class="copy btn-ghost">Copy Cash App Tag</button>
+          </div>
+          <div class="note">After purchase the in-page chat for this item will unlock so you and the seller can exchange messages.</div>
+          <div class="chat" data-item="${item.id}" style="display:none">
+            <div class="messages" id="messages-${item.id}"></div>
+            <div class="input-row">
+              <input type="text" placeholder="Write message..." class="chat-input" data-item="${item.id}" />
+              <button class="send">Send</button>
+            </div>
+          </div>
+        `;
 
+        c.querySelectorAll('.buy').forEach(b=>b.addEventListener('click',()=>onBuy(item)));
+        c.querySelectorAll('.offer').forEach(b=>b.addEventListener('click',()=>onOffer(item)));
+        c.querySelectorAll('.contact').forEach(b=>b.addEventListener('click',()=>onContact(item)));
+        c.querySelectorAll('.copy').forEach(b=>b.addEventListener('click',()=>copyCashtag()));
 
+        el.appendChild(c);
+      });
+
+      document.querySelectorAll('.send').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+          const input = btn.parentElement.querySelector('.chat-input');
+          const itemId = input.dataset.item;
+          const text = input.value.trim();
+          if(!text) return;
+          addMessage(itemId, 'You', text);
+          input.value='';
+        });
+      });
+    }
+
+    function copyCashtag(){
+      navigator.clipboard?.writeText(CASHAPP_TAG).then(()=>alert('Cashtag copied: ' + CASHAPP_TAG)).catch(()=>alert('Copy failed — please copy manually: ' + CASHAPP_TAG));
+    }
+
+    function onContact(item){
+      const subject = encodeURIComponent('Interest in: ' + item.title);
+      const body = encodeURIComponent('Hi,\n\nI am interested in your item: ' + item.title + '\nPlease contact me.\n\nThanks.');
+      window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${SELLER_EMAIL}&su=${subject}&body=${body}`, '_blank');
+    }
+
+    function onOffer(item){
+      const offer = prompt('Enter your offer amount in USD (numbers only):');
+      if(!offer) return;
+      const num = Number(offer);
+      if(isNaN(num) || num <= 0){ alert('Invalid amount'); return; }
+      const subject = encodeURIComponent('Offer for: ' + item.title);
+      const body = encodeURIComponent(`Hi,\n\nI make an offer of ${formatMoney(num)} for ${item.title}.\n\nPlease contact me to accept or counteroffer.\n\nYou can request payment via Cash App: ${CASHAPP_TAG} or this link: ${CASHAPP_URL}`);
+      window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${SELLER_EMAIL}&su=${subject}&body=${body}`, '_blank');
+    }
+
+    function onBuy(item){
+      if(item.type !== 'fixed') return;
+      const confirmed = confirm(`Buy ${item.title} for ${formatMoney(item.price)}? You will be asked to send payment via Cash App to ${CASHAPP_TAG}. Click OK to continue.`);
+      if(!confirmed) return;
+
+      const ok = confirm('This demo will now open the seller Cash App page in a new tab. After you send payment to the seller, click OK to unlock chat and messages with the seller. Do NOT send money unless you trust the seller.');
+      if(ok){
+        window.open(CASHAPP_URL,'_blank');
+      }
+
+      localStorage.setItem('purchased_' + item.id, '1');
+      unlockChatFor(item.id);
+      alert('Purchase marked locally — chat unlocked for this item. In a real site this would be verified by the server after confirmed payment.');
+    }
+
+    function unlockChatFor(itemId){
+      const chat = document.querySelector(`.chat[data-item="${itemId}"]`);
+      if(!chat) return;
+      chat.style.display = 'block';
+      loadMessages(itemId);
+    }
+
+    function addMessage(itemId, who, text){
+      const k = 'chat_' + itemId;
+      const arr = JSON.parse(localStorage.getItem(k) || '[]');
+      arr.push({who,text,ts:Date.now()});
+      localStorage.setItem(k, JSON.stringify(arr));
+      renderMessages(itemId);
+    }
+
+    function loadMessages(itemId){
+      renderMessages(itemId);
+    }
+
+    function renderMessages(itemId){
+      const msgs = JSON.parse(localStorage.getItem('chat_' + itemId) || '[]');
+      const cont = document.getElementById('messages-' + itemId);
+      if(!cont) return;
+      cont.innerHTML = '';
+      msgs.forEach(m=>{
+        const d = document.createElement('div'); d.className='msg';
+        d.innerHTML = `<strong>${m.who}</strong>: ${escapeHtml(m.text)} <div class="muted" style="font-size:11px">${new Date(m.ts).toLocaleString()}</div>`;
+        cont.appendChild(d);
+      });
+      cont.scrollTop = cont.scrollHeight;
+    }
+
+    function escapeHtml(str){return String(str).replace(/[&<>\"']/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[s]));}
+
+    window.addEventListener('DOMContentLoaded',()=>{
+      render();
+      CATALOG.forEach(it=>{
+        if(localStorage.getItem('purchased_' + it.id)) unlockChatFor(it.id);
+      });
+
+      document.querySelectorAll('.badge').forEach(b=>b.addEventListener('click',()=>window.open(CASHAPP_URL,'_blank')));
+    });
+  </script>
+</body>
+</html>
