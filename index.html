@@ -7,6 +7,7 @@ window.onload = () => {
 };
 
 <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -87,18 +88,23 @@ function login(){
   const email=document.getElementById('email').value.trim();
   const password=document.getElementById('password').value.trim();
 
+  // Owner login
   if(email==='kayston108@gmail.com' && password==='Hailee1212'){
     currentUser=email;
     isOwner=true;
     alert('Logged in as Owner!');
-  } else {
-    const users=loadUsers();
-    const u=users.find(u=>u.email===email && u.password===password);
-    if(!u){alert('Invalid credentials');return;}
-    currentUser=u.email;
-    isOwner=false;
+    document.getElementById('loginDiv').style.display='none';
+    document.getElementById('catalogDiv').style.display='block';
+    renderItems();
+    return;
   }
 
+  // Check normal users
+  const users=loadUsers();
+  const u=users.find(u=>u.email===email && u.password===password);
+  if(!u){alert('Invalid credentials');return;}
+  currentUser=u.email;
+  isOwner=false;
   document.getElementById('loginDiv').style.display='none';
   document.getElementById('catalogDiv').style.display='block';
   renderItems();
@@ -117,6 +123,74 @@ function renderItems(){
     const card=document.createElement('div');
     card.className='card';
 
-    // Owner always sees chat
-    let owns=orders.f
+    let owns=orders.find(o=>o.itemId===item.id && o.user===currentUser);
+    if(isOwner) owns=true;
 
+    card.innerHTML=`<h3>${item.title}</h3>
+    <p>Price: ${item.type==='fixed'? '$'+item.price : 'Offer'}</p>
+    <button type="button" onclick="buy('${item.id}')">${item.type==='fixed'?'Buy':'Make Offer'}</button>
+    <button type="button" onclick="contactSeller('${item.title}')">Contact Seller</button>
+    <div class="chat" id="chat-${item.id}">
+      <div class="messages" id="msgs-${item.id}"></div>
+      <input type="text" id="input-${item.id}" placeholder="Type message...">
+      <button type="button" onclick="sendMsg('${item.id}')">Send</button>
+    </div>`;
+    container.appendChild(card);
+
+    if(owns) document.getElementById(`chat-${item.id}`).style.display='block';
+    if(owns) renderMsgs(item.id);
+  });
+}
+
+// Buy / offer
+function buy(itemId){
+  const item=ITEMS.find(i=>i.id===itemId);
+  if(item.type==='fixed'){
+    if(!confirm(`Buy ${item.title} for $${item.price}?`)) return;
+    alert(`Open Cash App and send payment to ${CASHAPP_TAG}`);
+  }else{
+    const offer=prompt('Enter your offer amount in USD:');
+    if(!offer) return;
+    alert(`Offer of $${offer} sent! Open Gmail to contact seller.`);
+  }
+  const orders=loadOrders();
+  orders.push({user:currentUser,itemId});
+  saveOrders(orders);
+  document.getElementById(`chat-${itemId}`).style.display='block';
+}
+
+// Contact seller via Gmail
+function contactSeller(itemTitle){
+  const subject=encodeURIComponent('Interest in: '+itemTitle);
+  const body=encodeURIComponent(`Hi,\n\nI am interested in your item: ${itemTitle}\nPlease contact me.\n\nThanks.`);
+  window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${SELLER_EMAIL}&su=${subject}&body=${body}`,'_blank');
+}
+
+// Send message in chat
+function sendMsg(itemId){
+  const input=document.getElementById(`input-${itemId}`);
+  const text=input.value.trim();
+  if(!text) return;
+  const key='chat_'+itemId;
+  const msgs=JSON.parse(localStorage.getItem(key)||'[]');
+  msgs.push({who:currentUser,text});
+  localStorage.setItem(key,JSON.stringify(msgs));
+  renderMsgs(itemId);
+  input.value='';
+}
+
+// Render messages
+function renderMsgs(itemId){
+  const key='chat_'+itemId;
+  const msgs=JSON.parse(localStorage.getItem(key)||'[]');
+  const container=document.getElementById(`msgs-${itemId}`);
+  container.innerHTML='';
+  msgs.forEach(m=>{
+    const div=document.createElement('div');div.className='msg';
+    div.textContent=`${m.who}: ${m.text}`;
+    container.appendChild(div);
+  });
+}
+</script>
+</body>
+</html>
