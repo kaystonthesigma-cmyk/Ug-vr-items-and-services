@@ -41,9 +41,9 @@ ug-vr-marketplace/
 
 <script>
 const ITEMS = [
-  {id:'magmadon-1',title:'Mother Magmadon (Used)',price:20,type:'fixed'},
-  {id:'chomposa-1',title:'Mother Chomposauhras',price:null,type:'offer'},
-  {id:'triskelotops-1',title:'Triskelotops CARRY',price:null,type:'offer'}
+  {id:'magmadon-1',title:'Magma Whitnewoth (Cracks + Dots)',price:20,type:'fixed'},
+  {id:'chomposa-1',title:'Grugadon',price:null,type:'offer'},
+  {id:'triskelotops-1',title:'Triskelotops',price:null,type:'offer'}
 ];
 const CASHAPP_TAG='$kaystonbuckley';
 const SELLER_EMAIL='kayston108@gmail.com';
@@ -51,17 +51,17 @@ const SELLER_EMAIL='kayston108@gmail.com';
 let currentUser=null;
 let isOwner=false;
 
+// Storage helpers
 function saveUsers(users){localStorage.setItem('vr_users',JSON.stringify(users));}
 function loadUsers(){return JSON.parse(localStorage.getItem('vr_users')||'[]');}
 function saveOrders(orders){localStorage.setItem('vr_orders',JSON.stringify(orders));}
 function loadOrders(){return JSON.parse(localStorage.getItem('vr_orders')||'[]');}
 
-// Register new buyer
+// Register buyer (owner cannot register)
 function register(){
   const email=document.getElementById('email').value.trim();
   const password=document.getElementById('password').value.trim();
   if(!email||!password){alert('Enter email and password');return;}
-  // prevent overwriting owner account
   if(email==='kayston108@gmail.com'){alert('Owner account already exists. Use login.'); return;}
   const users=loadUsers();
   if(users.find(u=>u.email===email)){alert('Email exists');return;}
@@ -70,7 +70,7 @@ function register(){
   alert('Registered! You can now login.');
 }
 
-// Login function
+// Login function (owner always works)
 function login(){
   const email=document.getElementById('email').value.trim();
   const password=document.getElementById('password').value.trim();
@@ -92,4 +92,54 @@ function login(){
 }
 
 // Logout
-funct
+function logout(){currentUser=null; isOwner=false; document.getElementById('loginDiv').style.display='block'; document.getElementById('catalogDiv').style.display='none';}
+
+// Render catalog
+function renderItems(){
+  const container=document.getElementById('items');
+  container.innerHTML='';
+  const orders=loadOrders();
+
+  ITEMS.forEach(item=>{
+    const card=document.createElement('div');
+    card.className='card';
+
+    // Owner always sees chat
+    let owns=orders.find(o=>o.itemId===item.id && o.user===currentUser);
+    if(isOwner) owns=true;
+
+    card.innerHTML=`<h3>${item.title}</h3>
+    <p>Price: ${item.type==='fixed'? '$'+item.price : 'Offer'}</p>
+    <button onclick="buy('${item.id}')">${item.type==='fixed'?'Buy':'Make Offer'}</button>
+    <button onclick="contactSeller('${item.title}')">Contact Seller</button>
+    <div class="chat" id="chat-${item.id}">
+      <div class="messages" id="msgs-${item.id}"></div>
+      <input type="text" id="input-${item.id}" placeholder="Type message...">
+      <button onclick="sendMsg('${item.id}')">Send</button>
+    </div>`;
+    container.appendChild(card);
+
+    if(owns) document.getElementById(`chat-${item.id}`).style.display='block';
+    if(owns) renderMsgs(item.id);
+  });
+}
+
+// Buy / offer
+function buy(itemId){
+  const item=ITEMS.find(i=>i.id===itemId);
+  if(item.type==='fixed'){
+    if(!confirm(`Buy ${item.title} for $${item.price}?`)) return;
+    alert(`Open Cash App and send payment to ${CASHAPP_TAG}`);
+  }else{
+    const offer=prompt('Enter your offer amount in USD:');
+    if(!offer) return;
+    alert(`Offer of $${offer} sent! Open Gmail to contact seller.`);
+  }
+  const orders=loadOrders();
+  orders.push({user:currentUser,itemId});
+  saveOrders(orders);
+  document.getElementById(`chat-${itemId}`).style.display='block';
+}
+
+// Contact seller via Gmail
+function contactSeller(it
